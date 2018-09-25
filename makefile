@@ -14,6 +14,13 @@ debug: Simulate
 run: Simulate
 	./Simulate -i testInput.txt -o testOutput.txt
 
+test: Test.cpp
+	g++ -g -o Test Test.cpp -std=c++11
+
+runTest: test
+	./test
+
 clean:
 	rm *.o
+	rm Simulate
 	rm *.exe

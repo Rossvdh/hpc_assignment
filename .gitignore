@@ -2,3 +2,5 @@ Simulate
 *.o
 *.exe
 *.pdf
+*.dcd
+*.pdb

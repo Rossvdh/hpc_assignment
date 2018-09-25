@@ -1,4 +1,4 @@
-The_simulation.dcd
+example_pn3_10RU_751frames.dcd
 2
 1,25-28,67,101
 101-605

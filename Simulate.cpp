@@ -7,6 +7,8 @@ Ross van der Heyde VHYROS001
 #include <sstream>
 #include <string>
 #include <vector>
+#include <algorithm>
+#include "dcdplugin.c"
 
 std::vector<int> parseNumbers(std::string& numbers) {
 	std::cout << "parseNumbers: " << numbers << std::endl;
@@ -58,6 +60,9 @@ int main(int argc, char const *argv[]) {
 	//line 1: input DCD file
 	std::string dcdFile;
 	std::getline(myFile, dcdFile);
+
+	dcdFile.erase(std::remove(dcdFile.begin(), dcdFile.end(), '\r'), dcdFile.end());
+	dcdFile.erase(std::remove(dcdFile.begin(), dcdFile.end(), '\n'), dcdFile.end());
 	std::cout << "DCD file: " << dcdFile << std::endl;
 
 	//line 2: k
@@ -74,24 +79,39 @@ int main(int argc, char const *argv[]) {
 	//todo: parse line into numbers
 	std::vector<int> aIndx = parseNumbers(temp);
 
-	std::cout << "aIndx:" << std::endl;
-	for (std::vector<int>::iterator i = aIndx.begin(); i != aIndx.end(); ++i) {
+	// std::cout << "aIndx:" << std::endl;
+	/*for (std::vector<int>::iterator i = aIndx.begin(); i != aIndx.end(); ++i) {
 		std::cout << *i << std::endl;
-	}
+	}*/
 
 	//line 4: atoms in B
 	getline(myFile, temp);
 	std::cout << "Atoms in B: " << temp << std::endl;
 	std::vector<int> bIndx = parseNumbers(temp);
 
-	std::cout << "bIndx:" << std::endl;
-	for (std::vector<int>::iterator i = bIndx.begin(); i != bIndx.end(); ++i) {
+	// std::cout << "bIndx:" << std::endl;
+	/*for (std::vector<int>::iterator i = bIndx.begin(); i != bIndx.end(); ++i) {
 		std::cout << *i << std::endl;
-	}
+	}*/
 
 	myFile.close();
+	std::cout << "The file '" << inputFile << "' as been closed.\n" << std::endl;
 
 	//now the fun starts
+
+	//first, read DCD file, which is in dcdFile.
+	std::cout << "Reading .dcd file '" << dcdFile << "'...\n" << std::endl;
+
+	//get fileName as C-style string because we need to pass it as a char**
+	char* c_dcdFile = new char [dcdFile.size() + 1];
+	std::copy(dcdFile.begin(), dcdFile.end(), c_dcdFile);
+	c_dcdFile[dcdFile.size()] = '\0';
+
+	char* fileName [] = {c_dcdFile};
+	int num = testFunction(2, fileName);
+
+	std::cout << "returned val: " << num << std::endl;
+	delete[] c_dcdFile;
 
 	return 0;
 }
