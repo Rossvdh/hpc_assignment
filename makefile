@@ -14,8 +14,8 @@ debug: Simulate
 run: Simulate
 	./Simulate -i testInput.txt -o testOutput.txt
 
-test: Test.cpp
-	g++ -g -o Test Test.cpp -std=c++11
+test: Test.c
+	g++ -g -o Test Test.c
 
 runTest: test
 	./test

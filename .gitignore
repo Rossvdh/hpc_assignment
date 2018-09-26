@@ -4,3 +4,5 @@ Simulate
 *.pdf
 *.dcd
 *.pdb
+test.c
+Test
