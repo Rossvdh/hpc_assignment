@@ -12,7 +12,8 @@ debug: Simulate
 	gdb Simulate.exe
 
 run: Simulate
-	./Simulate -i testInput.txt -o testOutput.txt
+	 ./Simulate -i example_input_file1.txt -o outPutExample1.txt      
+# ./Simulate -i testInput.txt -o testOutput.txt
 
 test: Test.c
 	g++ -g -o Test Test.c

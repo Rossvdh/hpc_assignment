@@ -58,7 +58,6 @@ int main(int argc, char const *argv[]) {
 	outFile << "";
 	outFile.close();
 
-
 	//read input file
 	std::ifstream myFile(inputFile);
 
@@ -69,7 +68,7 @@ int main(int argc, char const *argv[]) {
 
 	dcdFile.erase(std::remove(dcdFile.begin(), dcdFile.end(), '\r'), dcdFile.end());
 	dcdFile.erase(std::remove(dcdFile.begin(), dcdFile.end(), '\n'), dcdFile.end());
-	std::cout << "DCD file: " << dcdFile << std::endl;
+	std::cout << ".dcd file: " << dcdFile << std::endl;
 
 	//line 2: k
 	std::string temp;
@@ -85,27 +84,17 @@ int main(int argc, char const *argv[]) {
 	//todo: parse line into numbers
 	std::vector<int> aIndx = parseNumbers(temp);
 
-	// std::cout << "aIndx:" << std::endl;
-	/*for (std::vector<int>::iterator i = aIndx.begin(); i != aIndx.end(); ++i) {
-		std::cout << *i << std::endl;
-	}*/
-
 	//line 4: atoms in B
 	getline(myFile, temp);
 	std::cout << "Atoms in B: " << temp << std::endl;
 	std::vector<int> bIndx = parseNumbers(temp);
-
-	// std::cout << "bIndx:" << std::endl;
-	/*for (std::vector<int>::iterator i = bIndx.begin(); i != bIndx.end(); ++i) {
-		std::cout << *i << std::endl;
-	}*/
 
 	myFile.close();
 	std::cout << "The file '" << inputFile << "' as been closed.\n" << std::endl;
 
 	//now the fun starts
 
-	//first, read DCD file, which is in dcdFile.
+	//read DCD file
 	std::cout << "Reading .dcd file '" << dcdFile << "'...\n" << std::endl;
 
 	//get fileName as C-style string because we need to pass it as a char**
@@ -114,92 +103,86 @@ int main(int argc, char const *argv[]) {
 	c_dcdFile[dcdFile.size()] = '\0';
 
 	char* fileName [] = {c_dcdFile};
-	// int num = testFunction(2, fileName);
 
-	/*open_dcd_read
-	read_dcdheader
-	read_next_timestep/read_dcdstep ??
-		calculate?
-
-	close_file_read*/
-	std::cout << "opening file" << std::endl;
 	int natoms = 0;
 	void* v = open_dcd_read(*fileName, "dcd", &natoms);
-	std::cout << "open!" << std::endl;
+	std::cout << "'" << dcdFile << "' opened" << std::endl;
 	std::cout << "natoms: " << natoms << std::endl;
 
 	//cast to dcdhandle
 	dcdhandle* handle = (dcdhandle*) v;
-	std::cout << "cast" << std::endl;
+	// std::cout << "cast" << std::endl;
 	std::cout << "frames: " << handle->nsets << std::endl;
 
-	//read first timestep
-	int rc = MOLFILE_SUCCESS;
-	int timestepCounter = 1;
-
-	while (timestepCounter <= handle->nsets) {
+	//read timesteps
+	for (int timestepCounter = 0; timestepCounter <= 15; timestepCounter++) {
 		std::cout << "timestep: " << timestepCounter << std::endl;
-		molfile_timestep_t timestep;
-		timestep.coords = (float *)malloc(3 * sizeof(float) * natoms);
-		rc = read_next_timestep(v, natoms, &timestep);
+		molfile_timestep_t timestep; // data for the current timestep
+		timestep.coords = (double *)malloc(3 * sizeof(double) * natoms); //change to normal array?
+		int rc = read_next_timestep(v, natoms, &timestep);
 
-		//timestep is the data for the current timestep
+		//check for error
+		if (rc) {
+			std::cout << "error in read_next_timestep on frame " << timestepCounter << std::endl;
+			return 1;
+		}
 
 		//vector of distances
-		std::vector<std::pair<std::string, float> > distances;
+		std::vector<std::pair<std::string, double> > distances;
 
 		//calculate distances between those in aIndx and bIndx, put in distances
-		for (std::vector<int>::iterator i = aIndx.begin(); i != aIndx.end(); ++i) {
-			float ax, ay, az;
-			int a = *i;
-
+		for (std::vector<int>::iterator aIt = aIndx.begin(); aIt != aIndx.end(); ++aIt) {
+			//co-ords of atom
+			double ax, ay, az;
+			int a = *aIt;
+			std::cout << "a atom: " << a << std::endl;
 			ax = timestep.coords[3 * a];
 			ay = timestep.coords[(3 * a) + 1];
 			az = timestep.coords[(3 * a) + 2];
 
-
-			for (std::vector<int>::iterator i = bIndx.begin(); i != bIndx.end(); ++i) {
-				float bx, by, bz;
-				int b = *i;
+			for (std::vector<int>::iterator bIt = bIndx.begin(); bIt != bIndx.end(); ++bIt) {
+				//coords of atom
+				double bx, by, bz;
+				int b = *bIt;
+				std::cout << "b atom: " << b << std::endl;
 				bx = timestep.coords[3 * b];
 				by = timestep.coords[(3 * b) + 1];
 				bz = timestep.coords[(3 * b) + 2];
 
-				float dist = sqrt(pow((ax - bx), 2) + pow((ay - by), 2) + pow((az - bz), 2));
+				double dist = sqrt(pow((ax - bx), 2) + pow((ay - by), 2) + pow((az - bz), 2));
 
+				// key is "aAtomNo,bAtomNo". not using a hashtable because we want to sort
 				std::string key = std::to_string(a) + "," + std::to_string(b);
 
-				std::pair<std::string, float> entry(key, dist);
-
+				std::pair<std::string, double> entry(key, dist);
 				distances.push_back(entry);
-
-				std::cout << entry.first << ": " << entry.second << std::endl;
+				// std::cout << entry.first << ": " << entry.second << std::endl;
 			}
 		}
 
-		//get k shortest distances
+		//sort based on distance
 		std::sort(distances.begin(), distances.end(),
-		          [](const std::pair<std::string, float>& lhs, const std::pair<std::string, float>& rhs)
+		          [](const std::pair<std::string, double>& lhs, const std::pair<std::string, double>& rhs)
 		          ->bool{return lhs.second <= rhs.second;});
 
-		//write to outputFile.
+		//open output file for appending
 		std::ofstream outFile(outputFile, std::ios_base::app);
 
+		//write k shorted distances to file
 		for (int i = 0; i < k; ++i) {
 			outFile << timestepCounter << "," << distances[i].first << ","
 			        << distances[i].second << "\n";
 		}
-
 		outFile.close();
-		timestepCounter++;
 	}
 
 	//close file
+	std::cout << "Closing file '" << dcdFile << "'" << std::endl;
 	close_file_read(v);
-	std::cout << "closed!" << std::endl;
+	std::cout << ".dcd file closed" << std::endl;
 
-	// std::cout << "returned val: " << num << std::endl;
 	delete[] c_dcdFile;
 
+	std::cout << "Complete" << std::endl;
 	return 0;
 }

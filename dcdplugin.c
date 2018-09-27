@@ -989,7 +989,7 @@ static int read_next_timestep(void *v, int natoms, molfile_timestep_t *ts) {
 	 */
 	{
 		int natoms = dcd->natoms;
-		float *nts = ts->coords;
+		double *nts = ts->coords;
 		const float *bufx = dcd->x;
 		const float *bufy = dcd->y;
 		const float *bufz = dcd->z;
@@ -1099,7 +1099,7 @@ static void *open_dcd_write(const char *path, const char *filetype,
 static int write_timestep(void *v, const molfile_timestep_t *ts) {
 	dcdhandle *dcd = (dcdhandle *)v;
 	int i, rc, curstep;
-	float *pos = ts->coords;
+	double *pos = ts->coords;
 	double unitcell[6];
 	unitcell[0] = unitcell[2] = unitcell[5] = 0.0f;
 	unitcell[1] = unitcell[3] = unitcell[4] = 90.0f;
@@ -1224,7 +1224,7 @@ int testFunction(int argc, char** argv) {
 		printf("  %d atoms, %d frames, size: %6.1fMB\n", natoms, dcd->nsets, sizeMB);
 
 		starttime = time_of_day();
-		timestep.coords = (float *)malloc(3 * sizeof(float) * natoms);
+		timestep.coords = (double *)malloc(3 * sizeof(double) * natoms);
 		for (i = 0; i < dcd->nsets; i++) {
 			int rc = read_next_timestep(v, natoms, &timestep);
 			if (rc) {
