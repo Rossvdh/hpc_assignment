@@ -6,3 +6,5 @@ Simulate
 *.pdb
 test.c
 Test
+hpcassignment.sublime-project
+hpcassignment.sublime-workspace
