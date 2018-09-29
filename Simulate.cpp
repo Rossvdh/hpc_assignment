@@ -8,6 +8,7 @@ Ross van der Heyde VHYROS001
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <chrono>
 #include "dcdplugin.c"
 
 std::vector<int> parseNumbers(std::string& numbers) {
@@ -32,6 +33,12 @@ std::vector<int> parseNumbers(std::string& numbers) {
 	}
 
 	return vec;
+}
+
+double getTime() {
+	// std::chrono::milliseconds prevTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
+	return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+	// double test = prevTime.count();
 }
 
 int main(int argc, char const *argv[]) {
@@ -114,9 +121,14 @@ int main(int argc, char const *argv[]) {
 	// std::cout << "cast" << std::endl;
 	std::cout << "frames: " << handle->nsets << std::endl;
 
+	double totalTime = 0;
+	double initTime = getTime();
+
 	//read timesteps
-	for (int timestepCounter = 0; timestepCounter <= 15; timestepCounter++) {
-		std::cout << "timestep: " << timestepCounter << std::endl;
+	for (int timestepCounter = 0; timestepCounter < handle->nsets; timestepCounter++) {//REMOVE THIS TEN WHEN NOT TESTING
+		double prevTime = getTime();
+
+		// std::cout << "timestep: " << timestepCounter << std::endl;
 		molfile_timestep_t timestep; // data for the current timestep
 		timestep.coords = (double *)malloc(3 * sizeof(double) * natoms); //change to normal array?
 		int rc = read_next_timestep(v, natoms, &timestep);
@@ -135,7 +147,7 @@ int main(int argc, char const *argv[]) {
 			//co-ords of atom
 			double ax, ay, az;
 			int a = *aIt;
-			std::cout << "a atom: " << a << std::endl;
+			// std::cout << "a atom: " << a << std::endl;
 			ax = timestep.coords[3 * a];
 			ay = timestep.coords[(3 * a) + 1];
 			az = timestep.coords[(3 * a) + 2];
@@ -144,7 +156,7 @@ int main(int argc, char const *argv[]) {
 				//coords of atom
 				double bx, by, bz;
 				int b = *bIt;
-				std::cout << "b atom: " << b << std::endl;
+				// std::cout << "b atom: " << b << std::endl;
 				bx = timestep.coords[3 * b];
 				by = timestep.coords[(3 * b) + 1];
 				bz = timestep.coords[(3 * b) + 2];
@@ -161,12 +173,21 @@ int main(int argc, char const *argv[]) {
 		}
 
 		//sort based on distance
-		std::sort(distances.begin(), distances.end(),
-		          [](const std::pair<std::string, double>& lhs, const std::pair<std::string, double>& rhs)
-		          ->bool{return lhs.second <= rhs.second;});
+		//You don't need to sort. Just go through array and keep k shortest distances
+		std::partial_sort(distances.begin(), distances.begin() + k, distances.end(),
+		                  [](const std::pair<std::string, double>& lhs, const std::pair<std::string, double>& rhs)
+		                  ->bool{return lhs.second <= rhs.second;});
+
+		totalTime += (getTime() - prevTime);
+
+
+		//maybe use dv&c algorithm k times, each time discarding the closest pair?
+
+
 
 		//open output file for appending
 		std::ofstream outFile(outputFile, std::ios_base::app);
+		outFile.precision(15);
 
 		//write k shorted distances to file
 		for (int i = 0; i < k; ++i) {
@@ -175,6 +196,10 @@ int main(int argc, char const *argv[]) {
 		}
 		outFile.close();
 	}
+
+	std::cout << "atoms Time: " << (totalTime / 1000) << " s" << std::endl;
+	double temp2 = getTime() - initTime;
+	std::cout << "total time: " << temp2 << std::endl;
 
 	//close file
 	std::cout << "Closing file '" << dcdFile << "'" << std::endl;
