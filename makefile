@@ -15,6 +15,15 @@ run: Simulate
 	 ./Simulate -i example_input_file1.txt -o outPutExample1.txt      
 # ./Simulate -i testInput.txt -o testOutput.txt
 
+openmp: SimulateOMP.o
+	g++ -g -fopenmp -o SimulateOMP SimulateOMP.o -std=c++11
+
+SimulateOMP.o: SimulateOMP.cpp
+	g++ -c -g -fopenmp -o SimulateOMP.o SimulateOMP.cpp -std=c++11
+
+runOpenmp: openmp
+	./SimulateOMP -i example_input_file1.txt -o openMPoutput.txt 
+
 test: Test.c
 	g++ -g -o Test Test.c
 
