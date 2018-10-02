@@ -1,4 +1,5 @@
 Simulate
+SimulateOMP
 *.o
 *.exe
 *.pdf
