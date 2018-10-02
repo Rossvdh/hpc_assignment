@@ -42,6 +42,20 @@ double getTime() {
 	// double test = prevTime.count();
 }
 
+//represents the distance between 2 points (aIndx and bIndx)
+//at a specific timestep
+struct shortPairData {
+	int timestep;
+	// int aIndx;
+	// int bIndx;
+	std::string key;
+	double distance;
+
+	std::string toString() {
+		return std::to_string(timestep) + "," + key + "," + std::to_string(distance);
+	}
+};
+
 int main(int argc, char const *argv[]) {
 	std::cout << "Simulate with OpenMP" << std::endl;
 
@@ -135,7 +149,7 @@ int main(int argc, char const *argv[]) {
 
 	//read timesteps
 	std::vector<molfile_timestep_t> timesteps;
-	for (int timestepCounter = 0; timestepCounter < handle->nsets; timestepCounter++) {
+	for (int timestepCounter = 0; timestepCounter < handle->nsets; ++timestepCounter) {
 		// std::cout << "timestep: " << timestepCounter << std::endl;
 		molfile_timestep_t timestep; // data for the current timestep
 		timestep.coords = (double *)malloc(3 * sizeof(double) * natoms); //change to normal array?
@@ -144,19 +158,17 @@ int main(int argc, char const *argv[]) {
 		timesteps.push_back(timestep);
 	}
 
-	std::vector<std::string> writeToFile;// e.g. "0,304,168043,14.23986456"
+	std::vector<shortPairData> writeToFile;// e.g. "0,304,168043,14.23986456"
 	std::cout << "timesteps.size: " << timesteps.size() << std::endl;
 	std::cout << "About to enter the parallel section...!" << std::endl;
 	#pragma omp parallel for //firstprivate(writeToFile)
-	for (int t = 0; t < timesteps.size(); t++) {
+	for (int t = 0; t < 10; ++t) {
 		// for (std::vector<molfile_timestep_t>::iterator ts = timesteps.begin(); ts != timesteps.end(); ++ts) {
 		// the timesteps are independent of each other, so this loop can be parallelized
 
 		const molfile_timestep_t timestep = timesteps[t];
 
 		std::vector<std::pair<std::string, double> > distances;
-		// #pragma omp parallel for //all threads need access to the timestep data
-		// for (int i = 0; i < aIndx.size(); i++) {
 		for (std::vector<int>::iterator aIt = aIndx.begin(); aIt != aIndx.end(); ++aIt) {
 			//the calculations for distances of the a atoms are independent of each other,
 			//so this loop can be parallelized.
@@ -188,44 +200,60 @@ int main(int argc, char const *argv[]) {
 				// std::cout << entry.first << ": " << entry.second << std::endl;
 			}
 		}
-		//sort based on distances
+		//sort first k based on distances
 		std::partial_sort(distances.begin(), distances.begin() + k, distances.end(),
 		                  [](const std::pair<std::string, double>& lhs, const std::pair<std::string, double>& rhs)
 		                  ->bool{return lhs.second <= rhs.second;});
 
 		// add k distances to writeToFile
 		for (int j = 0; j < k; j++) {
-			std::string line = std::to_string(t) + "," + distances[k].first + ","
-			                   + std::to_string(distances[k].second) + "\n";
+			shortPairData spd;
+			spd.timestep = t;
+			spd.key = distances[j].first;
+			spd.distance = distances[j].second;
 			#pragma omp critical
 			{
-				writeToFile.push_back(line);
+				writeToFile.push_back(spd);
 			}
 		}
 	}
 	std::cout << "Back to serial" << std::endl;
+	delete[] c_dcdFile;
 	//we are now back to serial
 	//at some point we have to write to a file, which must be done in serial.
 	//the k smallest distances must be accessible at this time
 	// probably in a vector, which must be written to by many threads.
 	//open output file for appending
 
-	//TODO fix this sorting
-	std::sort(writeToFile.begin(), writeToFile.end());
+	//TODO fix this sorting...in process
+	std::sort(writeToFile.begin(), writeToFile.end(),
+	[](const shortPairData p1, const shortPairData p2)->bool{
+		if (p1.timestep == p2.timestep) {
+			return p1.distance <= p2.distance;
+		} else{
+			return p1.timestep < p2.timestep;
+		}
+	});
 
 
-	std::cout << "writing to output file" << std::endl;
+	// the results seem to be out of order somehow,
+	//with calculations correct but timesteps not matching michelle's example output
+
+	std::cout << "writing to output file '" << outputFile << "' " << std::endl;
 	std::ofstream outFile(outputFile);
 	outFile.precision(15);
 
 	std::cout << "writeToFile.size: " << writeToFile.size() << std::endl;
-	for (std::vector<std::string>::iterator i = writeToFile.begin(); i != writeToFile.end(); ++i) {
-		outFile  << *i;
+	for (std::vector<shortPairData>::iterator i = writeToFile.begin(); i != writeToFile.end(); ++i) {
+		outFile << i->toString() << std::endl;
 	}
 
 	outFile.close();
 	std::cout << "writing output complete" << std::endl;
 
+	std::cout << "Closing file '" << dcdFile << "'" << std::endl;
+	close_file_read(v);
+	std::cout << ".dcd file closed" << std::endl;
 
 	delete[] c_dcdFile;
 
