@@ -144,7 +144,7 @@ typedef struct molfile_timestep_metadata {
  * Per-timestep atom coordinates and periodic cell information
  */
 typedef struct {
-	double *coords;
+	float *coords;
 	float *velocities;
 	float A, B, C, alpha, beta, gamma;
 	double physical_time;

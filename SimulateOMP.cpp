@@ -75,6 +75,12 @@ int main(int argc, char const *argv[]) {
 	std::cout << "input file: " << inputFile << std::endl;
 	std::cout << "output file: " << outputFile << std::endl;
 
+	//clear text from output file
+	std::ofstream outFile(outputFile);
+	outFile << "";
+	outFile.close();
+
+
 	//read input file
 	std::ifstream myFile(inputFile);
 
@@ -134,8 +140,6 @@ int main(int argc, char const *argv[]) {
 	double totalTime = 0;
 	double initTime = getTime();
 
-
-
 	//dcd file has been opened
 	//can we read timesteps in parallel? (lets assume not for now)
 	//read timestep data into vector
@@ -147,8 +151,8 @@ int main(int argc, char const *argv[]) {
 
 
 
-	//read timesteps
-	std::vector<molfile_timestep_t> timesteps;
+	//read timesteps. this seems very inefficient
+	/*std::vector<molfile_timestep_t> timesteps;
 	for (int timestepCounter = 0; timestepCounter < handle->nsets; ++timestepCounter) {
 		// std::cout << "timestep: " << timestepCounter << std::endl;
 		molfile_timestep_t timestep; // data for the current timestep
@@ -156,26 +160,44 @@ int main(int argc, char const *argv[]) {
 		int rc = read_next_timestep(v, natoms, &timestep);
 
 		timesteps.push_back(timestep);
-	}
+	}*/
 
 	std::vector<shortPairData> writeToFile;// e.g. "0,304,168043,14.23986456"
-	std::cout << "timesteps.size: " << timesteps.size() << std::endl;
-	std::cout << "About to enter the parallel section...!" << std::endl;
-	#pragma omp parallel for //firstprivate(writeToFile)
+	// std::cout << "timesteps.size: " << timesteps.size() << std::endl;
+	// std::cout << "About to enter the parallel section...!" << std::endl;
+	// #pragma omp parallel for //firstprivate(writeToFile)
 	for (int t = 0; t < 10; ++t) {
-		// for (std::vector<molfile_timestep_t>::iterator ts = timesteps.begin(); ts != timesteps.end(); ++ts) {
 		// the timesteps are independent of each other, so this loop can be parallelized
 
-		const molfile_timestep_t timestep = timesteps[t];
+		//---------------
+		std::cout << "timestep: " << t << std::endl;
+		molfile_timestep_t timestep; // data for the current timestep
+		timestep.coords = (float *)malloc(3 * sizeof(float) * natoms); //change to normal array?
 
+		//vector of distances
+		// std::vector<std::pair<std::string, double> > distances;
+		int rc = read_next_timestep(handle, natoms, &timestep);
+
+		//check for error
+		if (rc) {
+			std::cout << "error in read_next_timestep on frame " << t << std::endl;
+			// return 1;
+		}
+		//----------------------
+
+		// const molfile_timestep_t timestep = timesteps[t];
 		std::vector<std::pair<std::string, double> > distances;
-		for (std::vector<int>::iterator aIt = aIndx.begin(); aIt != aIndx.end(); ++aIt) {
+		// for (std::vector<int>::iterator aIt = aIndx.begin(); aIt != aIndx.end(); ++aIt) {
+		std::cout << "About to enter the parallel section...!" << std::endl;
+		#pragma omp parallel for
+		for (int aIt = 0; aIt < aIndx.size(); aIt++) {
 			//the calculations for distances of the a atoms are independent of each other,
 			//so this loop can be parallelized.
 
 			//co-ords of atom
 			double ax, ay, az;
-			int a = *aIt;
+			// int a = *aIt;
+			int a = aIndx[aIt];
 			// std::cout << "a atom: " << a << std::endl;
 			ax = timestep.coords[3 * a];
 			ay = timestep.coords[(3 * a) + 1];
@@ -196,17 +218,38 @@ int main(int argc, char const *argv[]) {
 				std::string key = std::to_string(a) + "," + std::to_string(b);
 
 				std::pair<std::string, double> entry(key, dist);
-				distances.push_back(entry);
+				#pragma omp critical
+				{
+					distances.push_back(entry);
+				}
 				// std::cout << entry.first << ": " << entry.second << std::endl;
 			}
 		}
+		//back to serial
+		std::cout << "back to serial" << std::endl;
 		//sort first k based on distances
 		std::partial_sort(distances.begin(), distances.begin() + k, distances.end(),
 		                  [](const std::pair<std::string, double>& lhs, const std::pair<std::string, double>& rhs)
 		                  ->bool{return lhs.second <= rhs.second;});
 
+		//---------------------------
+		//open output file for writing
+		std::ofstream outFile(outputFile, std::ios_base::app);
+		outFile.precision(15);
+
+		//write k shorted distances to file
+		for (int i = 0; i < k; ++i) {
+			outFile << t << "," << distances[i].first << ","
+			        << distances[i].second << "\n";
+		}
+		outFile.close();
+
+		delete[] timestep.coords;//not sure if this is necessary
+		//-----------------------
+
+
 		// add k distances to writeToFile
-		for (int j = 0; j < k; j++) {
+		/*for (int j = 0; j < k; j++) {
 			shortPairData spd;
 			spd.timestep = t;
 			spd.key = distances[j].first;
@@ -215,10 +258,10 @@ int main(int argc, char const *argv[]) {
 			{
 				writeToFile.push_back(spd);
 			}
-		}
+		}*/
 	}
-	std::cout << "Back to serial" << std::endl;
-	delete[] c_dcdFile;
+	/*std::cout << "Back to serial" << std::endl;
+	// delete[] c_dcdFile;
 	//we are now back to serial
 	//at some point we have to write to a file, which must be done in serial.
 	//the k smallest distances must be accessible at this time
@@ -249,7 +292,7 @@ int main(int argc, char const *argv[]) {
 	}
 
 	outFile.close();
-	std::cout << "writing output complete" << std::endl;
+	std::cout << "writing output complete" << std::endl;*/
 
 	std::cout << "Closing file '" << dcdFile << "'" << std::endl;
 	close_file_read(v);

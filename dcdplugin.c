@@ -947,6 +947,8 @@ static void *open_dcd_read(const char *path, const char *filetype,
 
 
 static int read_next_timestep(void *v, int natoms, molfile_timestep_t *ts) {
+	printf("read_next_timestep\n");
+
 	dcdhandle *dcd;
 	int i, j, rc;
 	float unitcell[6];
@@ -957,7 +959,9 @@ static int read_next_timestep(void *v, int natoms, molfile_timestep_t *ts) {
 	/* Check for EOF here; that way all EOF's encountered later must be errors */
 	if (dcd->setsread == dcd->nsets) return MOLFILE_EOF;
 	dcd->setsread++;
-	if (!ts) {
+	printf("about to test\n");
+	if (!ts) {//if(ts == nullptr)
+		printf("first!\n");
 		if (dcd->first && dcd->nfixed) {
 			/* We can't just skip it because we need the fixed atom coordinates */
 			rc = read_dcdstep(dcd->fd, dcd->natoms, dcd->x, dcd->y, dcd->z,
@@ -969,6 +973,8 @@ static int read_next_timestep(void *v, int natoms, molfile_timestep_t *ts) {
 		dcd->first = 0;
 		/* XXX this needs to be changed */
 		return skip_dcdstep(dcd->fd, dcd->natoms, dcd->nfixed, dcd->charmm);
+	} else {
+		printf("else\n");
 	}
 	rc = read_dcdstep(dcd->fd, dcd->natoms, dcd->x, dcd->y, dcd->z, unitcell,
 	                  dcd->nfixed, dcd->first, dcd->freeind, dcd->fixedcoords,
@@ -989,7 +995,7 @@ static int read_next_timestep(void *v, int natoms, molfile_timestep_t *ts) {
 	 */
 	{
 		int natoms = dcd->natoms;
-		double *nts = ts->coords;
+		float *nts = ts->coords;
 		const float *bufx = dcd->x;
 		const float *bufy = dcd->y;
 		const float *bufz = dcd->z;
@@ -1099,7 +1105,7 @@ static void *open_dcd_write(const char *path, const char *filetype,
 static int write_timestep(void *v, const molfile_timestep_t *ts) {
 	dcdhandle *dcd = (dcdhandle *)v;
 	int i, rc, curstep;
-	double *pos = ts->coords;
+	float *pos = ts->coords;
 	double unitcell[6];
 	unitcell[0] = unitcell[2] = unitcell[5] = 0.0f;
 	unitcell[1] = unitcell[3] = unitcell[4] = 90.0f;
@@ -1224,7 +1230,7 @@ int testFunction(int argc, char** argv) {
 		printf("  %d atoms, %d frames, size: %6.1fMB\n", natoms, dcd->nsets, sizeMB);
 
 		starttime = time_of_day();
-		timestep.coords = (double *)malloc(3 * sizeof(double) * natoms);
+		timestep.coords = (float *)malloc(3 * sizeof(float) * natoms);
 		for (i = 0; i < dcd->nsets; i++) {
 			int rc = read_next_timestep(v, natoms, &timestep);
 			if (rc) {

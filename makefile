@@ -5,7 +5,7 @@
 Simulate: Simulate.o
 	g++ -g -o Simulate Simulate.o -std=c++11
 
-Simulate.o: Simulate.cpp
+Simulate.o: Simulate.cpp dcdplugin.c
 	g++ -c -g -o Simulate.o Simulate.cpp -std=c++11
 
 debug: Simulate
@@ -18,10 +18,10 @@ run: Simulate
 openmp: SimulateOMP.o
 	g++ -g -fopenmp -o SimulateOMP SimulateOMP.o -std=c++11
 
-SimulateOMP.o: SimulateOMP.cpp
+SimulateOMP.o: SimulateOMP.cpp dcdplugin.c
 	g++ -c -g -fopenmp -o SimulateOMP.o SimulateOMP.cpp -std=c++11
 
-runOpenmp: openmp
+runopenmp: openmp
 	./SimulateOMP -i example_input_file1.txt -o openMPoutput.txt 
 
 test: Test.c
@@ -33,4 +33,4 @@ runTest: test
 clean:
 	rm *.o
 	rm Simulate
-	rm *.exe
+#	rm *.exe

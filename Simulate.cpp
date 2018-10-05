@@ -9,6 +9,7 @@ Ross van der Heyde VHYROS001
 #include <vector>
 #include <algorithm>
 #include <chrono>
+// #include <stdlib.h>
 #include "dcdplugin.c"
 
 std::vector<int> parseNumbers(std::string& numbers) {
@@ -42,7 +43,7 @@ double getTime() {
 }
 
 int main(int argc, char const *argv[]) {
-	std::cout << "Simulate" << std::endl;
+	std::cout << "Simulate serial" << std::endl;
 
 	//read cmd line params
 	std::string inputFile = "";
@@ -125,27 +126,67 @@ int main(int argc, char const *argv[]) {
 	double initTime = getTime();
 
 	//read timesteps
-	for (int timestepCounter = 0; timestepCounter < handle->nsets; timestepCounter++) {//REMOVE THIS TEN WHEN NOT TESTING
+	for (int timestepCounter = 0; timestepCounter < 10; timestepCounter++) {//REMOVE THIS WHEN NOT TESTING
+		// for (int timestepCounter = 0; timestepCounter < handle->nsets; timestepCounter++) {
 		double prevTime = getTime();
 
-		// std::cout << "timestep: " << timestepCounter << std::endl;
+		std::cout << "timestep: " << timestepCounter << std::endl;
 		molfile_timestep_t timestep; // data for the current timestep
-		timestep.coords = (double *)malloc(3 * sizeof(double) * natoms); //change to normal array?
-		int rc = read_next_timestep(v, natoms, &timestep);
-
-		//check for error
-		if (rc) {
-			std::cout << "error in read_next_timestep on frame " << timestepCounter << std::endl;
-			return 1;
-		}
+		timestep.coords = (float *)malloc(3 * sizeof(float) * natoms); //change to normal array?
 
 		//vector of distances
 		std::vector<std::pair<std::string, double> > distances;
 
+
+		if (timestepCounter == 0) {
+			//read first time step
+			float unitcell[6];
+			unitcell[0] = unitcell[2] = unitcell[5] = 0.0f;
+			unitcell[1] = unitcell[3] = unitcell[4] = 90.0f;
+			//read first timestep
+			int rc = read_dcdstep(handle->fd, handle->natoms, handle->x, handle->y, handle->z,
+			                      unitcell, handle->nfixed, handle->first, handle->freeind, handle->fixedcoords,
+			                      handle->reverse, handle->charmm);
+			handle->first = 0;
+			handle->setsread++;
+			std::cout << "read_dcdstep called" << std::endl;
+			if (rc < 0) {
+				print_dcderror("read_dcdstep", rc);
+				delete [] timestep.coords;
+				return MOLFILE_ERROR;
+			}
+			// int temp = skip_dcdstep(handle->fd, handle->natoms, handle->nfixed, handle->charmm);
+			// std::cout << "temp: " << temp << std::endl;
+			// std::cout << "skip_dcdstep called" << std::endl;
+
+			//copy handle->x, handle->y and handle->z into timestep.coords
+			// timestep.coords is xyz, xyz, xyz ....
+			//but you've copied from handle->xyz so that is it xxxxxx..xxx,yyyyyyyy...yyy,zzzzzzz....zzz
+
+			for (int i = 0; i < handle->natoms; ++i) {
+				timestep.coords[(3 * i)] = handle->x[i];
+				timestep.coords[(3 * i) + 1] = handle->y[i];
+				timestep.coords[(3 * i) + 2] = handle->z[i];
+			}
+
+			// memcpy(timestep.coords, handle->x, handle->natoms * sizeof(float));
+			// memcpy(timestep.coords + handle->natoms, handle->y, handle->natoms * sizeof(float));
+			// memcpy(timestep.coords + (2 * handle->natoms), handle->z, handle->natoms * sizeof(float));
+		} else {
+
+			int rc = read_next_timestep(handle, natoms, &timestep);
+
+			//check for error
+			if (rc) {
+				std::cout << "error in read_next_timestep on frame " << timestepCounter << std::endl;
+				return 1;
+			}
+		}
+
 		//calculate distances between those in aIndx and bIndx, put in distances
 		for (std::vector<int>::iterator aIt = aIndx.begin(); aIt != aIndx.end(); ++aIt) {
 			//co-ords of atom
-			double ax, ay, az;
+			float ax, ay, az;
 			int a = *aIt;
 			// std::cout << "a atom: " << a << std::endl;
 			ax = timestep.coords[3 * a];
@@ -154,7 +195,7 @@ int main(int argc, char const *argv[]) {
 
 			for (std::vector<int>::iterator bIt = bIndx.begin(); bIt != bIndx.end(); ++bIt) {
 				//coords of atom
-				double bx, by, bz;
+				float bx, by, bz;
 				int b = *bIt;
 				// std::cout << "b atom: " << b << std::endl;
 				bx = timestep.coords[3 * b];
@@ -177,13 +218,9 @@ int main(int argc, char const *argv[]) {
 		std::partial_sort(distances.begin(), distances.begin() + k, distances.end(),
 		                  [](const std::pair<std::string, double>& lhs, const std::pair<std::string, double>& rhs)
 		                  ->bool{return lhs.second <= rhs.second;});
-
-		totalTime += (getTime() - prevTime);
-
-
 		//maybe use dv&c algorithm k times, each time discarding the closest pair?
 
-
+		totalTime += (getTime() - prevTime);
 
 		//open output file for appending
 		std::ofstream outFile(outputFile, std::ios_base::app);
@@ -195,11 +232,15 @@ int main(int argc, char const *argv[]) {
 			        << distances[i].second << "\n";
 		}
 		outFile.close();
+
+		delete[] timestep.coords;//not sure if this is necessary
 	}
 
 	std::cout << "atoms Time: " << (totalTime / 1000) << " s" << std::endl;
 	double temp2 = getTime() - initTime;
-	std::cout << "total time: " << temp2 << std::endl;
+	std::cout << "total time: " << (temp2 / 1000) << " s" << std::endl;
+
+	std::cout << "Output written to " << outputFile << std::endl;
 
 	//close file
 	std::cout << "Closing file '" << dcdFile << "'" << std::endl;
