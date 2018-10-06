@@ -1,4 +1,8 @@
-/*CSC4000W HPC assignment
+/*CSC4000W HPC assignment. The Open MP version
+parallelized at the timestep level.
+reads all timestep data into a vector, then in parallel does calculations for each timestep,
+puts shortest pair data for each timestep into a vector, end parallel.
+Then writes shortest pair data from vector into output file in serial
 Ross van der Heyde VHYROS001
 19 September 2018*/
 
@@ -9,8 +13,8 @@ Ross van der Heyde VHYROS001
 #include <vector>
 #include <algorithm>
 #include <chrono>
-// #include <stdlib.h>
 #include "dcdplugin.c"
+#include <omp.h>
 
 std::vector<int> parseNumbers(std::string& numbers) {
 	// std::cout << "parseNumbers: " << numbers << std::endl;
@@ -42,8 +46,22 @@ double getTime() {
 	// double test = prevTime.count();
 }
 
+//represents the distance between 2 points (aIndx and bIndx)
+//at a specific timestep
+struct shortPairData {
+	int timestep;
+	// int aIndx;
+	// int bIndx;
+	std::string key;
+	double distance;
+
+	std::string toString() {
+		return std::to_string(timestep) + "," + key + "," + std::to_string(distance);
+	}
+};
+
 int main(int argc, char const *argv[]) {
-	std::cout << "Simulate serial" << std::endl;
+	std::cout << "Simulate with OpenMP" << std::endl;
 
 	//read cmd line params
 	std::string inputFile = "";
@@ -122,29 +140,47 @@ int main(int argc, char const *argv[]) {
 	// std::cout << "cast" << std::endl;
 	std::cout << "frames: " << handle->nsets << std::endl;
 
-	double initTime = getTime();
+	//dcd file has been opened
+	//read timestep data into vector
+	//start timer
+	//for each timestep: (in parallel)
+	//	calculate distances
+	//	add to writeToFile
+	//back to serial
+	//end timer
+	//sort writeToFile
+	//write output to file
+	//done
 
-	//read timesteps
-	// for (int timestepCounter = 0; timestepCounter < 10; timestepCounter++) {//REMOVE THIS WHEN NOT TESTING
-	for (int timestepCounter = 0; timestepCounter < handle->nsets; timestepCounter++) {
-		// double prevTime = getTime();
-
-		std::cout << "timestep: " << timestepCounter << std::endl;
+	//read timesteps. this seems very inefficient. uses a lot of memory. may its just my weak laptop
+	std::vector<molfile_timestep_t> timesteps;
+	for (int timestepCounter = 0; timestepCounter < handle->nsets; ++timestepCounter) {
+		// std::cout << "timestep: " << timestepCounter << std::endl;
 		molfile_timestep_t timestep; // data for the current timestep
 		timestep.coords = (float *)malloc(3 * sizeof(float) * natoms); //change to normal array?
+		int rc = read_next_timestep(v, natoms, &timestep);
 
-		int rc = read_next_timestep(handle, natoms, &timestep);
-		//check for error
-		if (rc) {
-			std::cout << "error in read_next_timestep on frame " << timestepCounter << std::endl;
-			return 1;
-		}
+		timesteps.push_back(timestep);
+	}
+	std::cout << "Closing file '" << dcdFile << "'" << std::endl;
+	close_file_read(v);
+	std::cout << ".dcd file closed" << std::endl;
 
-		//vector of distances
+
+	std::vector<shortPairData> writeToFile;// e.g. "0,304,168043,14.23986456"
+	std::cout << "timesteps.size: " << timesteps.size() << std::endl;
+	std::cout << "About to enter the parallel section...!" << std::endl;
+	double initTime = getTime();
+	#pragma omp parallel for
+	for (int t = 0; t < handle->nsets; ++t) {
+		// the timesteps are independent of each other, so this loop can be parallelized
+		std::cout << "timestep " << t << std::endl;
+		const molfile_timestep_t timestep = timesteps[t];
 		std::vector<std::pair<std::string, double> > distances;
-
-		//calculate distances between those in aIndx and bIndx, put in distances
 		for (std::vector<int>::iterator aIt = aIndx.begin(); aIt != aIndx.end(); ++aIt) {
+			//the calculations for distances of the a atoms are independent of each other,
+			//so this loop can be parallelized.
+
 			//co-ords of atom
 			float ax, ay, az;
 			int a = *aIt;
@@ -169,45 +205,52 @@ int main(int argc, char const *argv[]) {
 
 				std::pair<std::string, double> entry(key, dist);
 				distances.push_back(entry);
-				// std::cout << entry.first << ": " << entry.second << std::endl;
 			}
 		}
-
-		//sort based on distance
-		//You don't need to sort. Just go through array and keep k shortest distances
+		//sort first k based on distances
 		std::partial_sort(distances.begin(), distances.begin() + k, distances.end(),
 		                  [](const std::pair<std::string, double>& lhs, const std::pair<std::string, double>& rhs)
 		                  ->bool{return lhs.second <= rhs.second;});
-		//maybe use dv&c algorithm k times, each time discarding the closest pair?
 
-		// totalTime += (getTime() - prevTime);
-
-		//open output file for appending
-		std::ofstream outFile(outputFile, std::ios_base::app);
-		outFile.precision(15);
-
-		//write k shorted distances to file
-		for (int i = 0; i < k; ++i) {
-			outFile << timestepCounter << "," << distances[i].first << ","
-			        << distances[i].second << "\n";
+		// add k distances to writeToFile
+		for (int j = 0; j < k; j++) {
+			shortPairData spd;
+			spd.timestep = t;
+			spd.key = distances[j].first;
+			spd.distance = distances[j].second;
+			#pragma omp critical
+			{
+				writeToFile.push_back(spd);
+			}
 		}
-		outFile.close();
+	}
+	std::cout << "Back to serial" << std::endl;
+	delete[] c_dcdFile;
 
-		delete[] timestep.coords;//not sure if this is necessary
+	//sort correctly
+	std::sort(writeToFile.begin(), writeToFile.end(),
+	[](const shortPairData p1, const shortPairData p2)->bool{
+		if (p1.timestep == p2.timestep) {
+			return p1.distance <= p2.distance;
+		} else{
+			return p1.timestep < p2.timestep;
+		}
+	});
+
+
+	std::cout << "writing to output file '" << outputFile << "' " << std::endl;
+	outFile.open(outputFile);
+	outFile.precision(15);
+
+	std::cout << "writeToFile.size: " << writeToFile.size() << std::endl;
+	for (std::vector<shortPairData>::iterator i = writeToFile.begin(); i != writeToFile.end(); ++i) {
+		outFile << i->toString() << std::endl;
 	}
 
-	// std::cout << "atoms Time: " << (totalTime / 1000) << " s" << std::endl;
-	double totalTime = getTime() - initTime;
-	std::cout << "total time: " << (totalTime / 1000) << " s" << std::endl;
-
-	std::cout << "Output written to " << outputFile << std::endl;
-
-	//close file
-	std::cout << "Closing file '" << dcdFile << "'" << std::endl;
-	close_file_read(v);
-	std::cout << ".dcd file closed" << std::endl;
-
-	delete[] c_dcdFile;
+	outFile.close();
+	double time = getTime() - initTime;
+	std::cout << "writing output complete" << std::endl;
+	std::cout << "Total time: " << (time / 1000) << " s" << std::endl;
 
 	std::cout << "Complete" << std::endl;
 	return 0;

@@ -947,7 +947,7 @@ static void *open_dcd_read(const char *path, const char *filetype,
 
 
 static int read_next_timestep(void *v, int natoms, molfile_timestep_t *ts) {
-	printf("read_next_timestep\n");
+	// printf("read_next_timestep\n");
 
 	dcdhandle *dcd;
 	int i, j, rc;
@@ -959,9 +959,9 @@ static int read_next_timestep(void *v, int natoms, molfile_timestep_t *ts) {
 	/* Check for EOF here; that way all EOF's encountered later must be errors */
 	if (dcd->setsread == dcd->nsets) return MOLFILE_EOF;
 	dcd->setsread++;
-	printf("about to test\n");
+	// printf("about to test\n");
 	if (!ts) {//if(ts == nullptr)
-		printf("first!\n");
+		// printf("first!\n");
 		if (dcd->first && dcd->nfixed) {
 			/* We can't just skip it because we need the fixed atom coordinates */
 			rc = read_dcdstep(dcd->fd, dcd->natoms, dcd->x, dcd->y, dcd->z,
@@ -974,7 +974,7 @@ static int read_next_timestep(void *v, int natoms, molfile_timestep_t *ts) {
 		/* XXX this needs to be changed */
 		return skip_dcdstep(dcd->fd, dcd->natoms, dcd->nfixed, dcd->charmm);
 	} else {
-		printf("else\n");
+		// printf("else\n");
 	}
 	rc = read_dcdstep(dcd->fd, dcd->natoms, dcd->x, dcd->y, dcd->z, unitcell,
 	                  dcd->nfixed, dcd->first, dcd->freeind, dcd->fixedcoords,

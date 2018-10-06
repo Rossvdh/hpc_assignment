@@ -1,6 +1,7 @@
 /*CSC4000W HPC assignment
 Ross van der Heyde VHYROS001
-19 September 2018*/
+5 October 2018
+reads all timestep data into a vecotr before performing calculations*/
 
 #include <iostream>
 #include <fstream>
@@ -122,23 +123,27 @@ int main(int argc, char const *argv[]) {
 	// std::cout << "cast" << std::endl;
 	std::cout << "frames: " << handle->nsets << std::endl;
 
-	double initTime = getTime();
-
 	//read timesteps
-	// for (int timestepCounter = 0; timestepCounter < 10; timestepCounter++) {//REMOVE THIS WHEN NOT TESTING
-	for (int timestepCounter = 0; timestepCounter < handle->nsets; timestepCounter++) {
-		// double prevTime = getTime();
-
-		std::cout << "timestep: " << timestepCounter << std::endl;
+	//read timesteps. this seems very inefficient. uses a lot of memory. may its just my weak laptop
+	std::vector<molfile_timestep_t> timesteps;
+	for (int timestepCounter = 0; timestepCounter < handle->nsets; ++timestepCounter) {
+		// std::cout << "timestep: " << timestepCounter << std::endl;
 		molfile_timestep_t timestep; // data for the current timestep
 		timestep.coords = (float *)malloc(3 * sizeof(float) * natoms); //change to normal array?
+		int rc = read_next_timestep(v, natoms, &timestep);
 
-		int rc = read_next_timestep(handle, natoms, &timestep);
-		//check for error
-		if (rc) {
-			std::cout << "error in read_next_timestep on frame " << timestepCounter << std::endl;
-			return 1;
-		}
+		timesteps.push_back(timestep);
+	}
+	//close file
+	std::cout << "Closing file '" << dcdFile << "'" << std::endl;
+	close_file_read(v);
+	std::cout << ".dcd file closed" << std::endl;
+
+	double initTime = getTime();
+	for (int timestepCounter = 0; timestepCounter < 10; timestepCounter++) {//REMOVE THIS WHEN NOT TESTING
+		// for (int timestepCounter = 0; timestepCounter < handle->nsets; timestepCounter++) {
+		std::cout << "timestep: " << timestepCounter << std::endl;
+		const molfile_timestep_t timestep = timesteps[timestepCounter];
 
 		//vector of distances
 		std::vector<std::pair<std::string, double> > distances;
@@ -180,8 +185,6 @@ int main(int argc, char const *argv[]) {
 		                  ->bool{return lhs.second <= rhs.second;});
 		//maybe use dv&c algorithm k times, each time discarding the closest pair?
 
-		// totalTime += (getTime() - prevTime);
-
 		//open output file for appending
 		std::ofstream outFile(outputFile, std::ios_base::app);
 		outFile.precision(15);
@@ -201,11 +204,6 @@ int main(int argc, char const *argv[]) {
 	std::cout << "total time: " << (totalTime / 1000) << " s" << std::endl;
 
 	std::cout << "Output written to " << outputFile << std::endl;
-
-	//close file
-	std::cout << "Closing file '" << dcdFile << "'" << std::endl;
-	close_file_read(v);
-	std::cout << ".dcd file closed" << std::endl;
 
 	delete[] c_dcdFile;
 

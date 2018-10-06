@@ -2,7 +2,8 @@
 # Ross van der Heyde VHYROS001
 # 17 September 2018
 
-Simulate: Simulate.o
+# serial version -------------------------------------------------
+serial: Simulate.o
 	g++ -g -o Simulate Simulate.o -std=c++11
 
 Simulate.o: Simulate.cpp dcdplugin.c
@@ -11,10 +12,21 @@ Simulate.o: Simulate.cpp dcdplugin.c
 debug: Simulate
 	gdb Simulate.exe
 
-run: Simulate
-	 ./Simulate -i example_input_file1.txt -o outPutExample1.txt      
+runserial: Simulate
+	 ./Simulate -i example_input_file1.txt -o serialOutput1.txt
 # ./Simulate -i testInput.txt -o testOutput.txt
 
+# serial version that reads all timestep data once--------------
+serialv2: Simulate_v2.o
+	g++ -g -o Simulate_v2 Simulate_v2.o -std=c++11
+
+Simulate_v2.o: Simulate_v2.cpp dcdplugin.c
+	g++ -c -g -o Simulate_v2.o Simulate_v2.cpp -std=c++11
+
+runserialv2: serialv2
+	 ./Simulate_v2 -i example_input_file1.txt -o serial_v2_Output1.txt
+
+# openmp version parallelized at a ---------------
 openmp: SimulateOMP.o
 	g++ -g -fopenmp -o SimulateOMP SimulateOMP.o -std=c++11
 
@@ -24,11 +36,17 @@ SimulateOMP.o: SimulateOMP.cpp dcdplugin.c
 runopenmp: openmp
 	./SimulateOMP -i example_input_file1.txt -o openMPoutput.txt 
 
-test: Test.c
-	g++ -g -o Test Test.c
+#openp version parallelized at timestep------------------------
+openmptimestep: omp_v2.o
+	g++ -g -fopenmp -o omp_v2 omp_v2.o -std=c++11
 
-runTest: test
-	./test
+omp_v2.o: omp_v2.cpp dcdplugin.c
+	g++ -c -g -fopenmp -o omp_v2.o omp_v2.cpp -std=c++11
+
+runopenmptimestep: openmptimestep
+	./omp_v2 -i example_input_file1.txt -o openMPTimestepOutput.txt
+
+#MPI version to come
 
 clean:
 	rm *.o
