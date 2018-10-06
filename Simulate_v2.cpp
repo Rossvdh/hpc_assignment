@@ -43,6 +43,20 @@ double getTime() {
 	// double test = prevTime.count();
 }
 
+//represents the distance between 2 points (aIndx and bIndx)
+//at a specific timestep
+struct shortPairData {
+	int timestep;
+	// int aIndx;
+	// int bIndx;
+	std::string key;
+	double distance;
+
+	std::string toString() {
+		return std::to_string(timestep) + "," + key + "," + std::to_string(distance);
+	}
+};
+
 int main(int argc, char const *argv[]) {
 	std::cout << "Simulate serial" << std::endl;
 
@@ -134,14 +148,12 @@ int main(int argc, char const *argv[]) {
 
 		timesteps.push_back(timestep);
 	}
-	//close file
-	std::cout << "Closing file '" << dcdFile << "'" << std::endl;
-	close_file_read(v);
-	std::cout << ".dcd file closed" << std::endl;
 
+
+	std::vector<shortPairData> writeToFile;// e.g. "0,304,168043,14.23986456"
 	double initTime = getTime();
-	for (int timestepCounter = 0; timestepCounter < 10; timestepCounter++) {//REMOVE THIS WHEN NOT TESTING
-		// for (int timestepCounter = 0; timestepCounter < handle->nsets; timestepCounter++) {
+	// for (int timestepCounter = 0; timestepCounter < 10; timestepCounter++) {//REMOVE THIS WHEN NOT TESTING
+	for (int timestepCounter = 0; timestepCounter < handle->nsets; timestepCounter++) {
 		std::cout << "timestep: " << timestepCounter << std::endl;
 		const molfile_timestep_t timestep = timesteps[timestepCounter];
 
@@ -185,27 +197,36 @@ int main(int argc, char const *argv[]) {
 		                  ->bool{return lhs.second <= rhs.second;});
 		//maybe use dv&c algorithm k times, each time discarding the closest pair?
 
-		//open output file for appending
-		std::ofstream outFile(outputFile, std::ios_base::app);
-		outFile.precision(15);
-
-		//write k shorted distances to file
-		for (int i = 0; i < k; ++i) {
-			outFile << timestepCounter << "," << distances[i].first << ","
-			        << distances[i].second << "\n";
+		// add k distances to writeToFile
+		for (int j = 0; j < k; j++) {
+			shortPairData spd;
+			spd.timestep = timestepCounter;
+			spd.key = distances[j].first;
+			spd.distance = distances[j].second;
+			writeToFile.push_back(spd);
 		}
-		outFile.close();
 
 		delete[] timestep.coords;//not sure if this is necessary
 	}
-
-	// std::cout << "atoms Time: " << (totalTime / 1000) << " s" << std::endl;
-	double totalTime = getTime() - initTime;
-	std::cout << "total time: " << (totalTime / 1000) << " s" << std::endl;
-
-	std::cout << "Output written to " << outputFile << std::endl;
-
+	//close file
+	std::cout << "Closing file '" << dcdFile << "'" << std::endl;
+	close_file_read(v);
+	std::cout << ".dcd file closed" << std::endl;
 	delete[] c_dcdFile;
+
+	std::cout << "writing to output file '" << outputFile << "' " << std::endl;
+	outFile.open(outputFile);
+	outFile.precision(15);
+
+	std::cout << "writeToFile.size: " << writeToFile.size() << std::endl;
+	for (std::vector<shortPairData>::iterator i = writeToFile.begin(); i != writeToFile.end(); ++i) {
+		outFile << i->toString() << std::endl;
+	}
+
+	outFile.close();
+	double time = getTime() - initTime;
+	std::cout << "writing output complete" << std::endl;
+	std::cout << "Total time: " << (time / 1000) << " s" << std::endl;
 
 	std::cout << "Complete" << std::endl;
 	return 0;

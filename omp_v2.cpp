@@ -162,14 +162,10 @@ int main(int argc, char const *argv[]) {
 
 		timesteps.push_back(timestep);
 	}
-	std::cout << "Closing file '" << dcdFile << "'" << std::endl;
-	close_file_read(v);
-	std::cout << ".dcd file closed" << std::endl;
-
 
 	std::vector<shortPairData> writeToFile;// e.g. "0,304,168043,14.23986456"
-	std::cout << "timesteps.size: " << timesteps.size() << std::endl;
-	std::cout << "About to enter the parallel section...!" << std::endl;
+	// std::cout << "timesteps.size: " << timesteps.size() << std::endl;
+	// std::cout << "About to enter the parallel section...!" << std::endl;
 	double initTime = getTime();
 	#pragma omp parallel for
 	for (int t = 0; t < handle->nsets; ++t) {
@@ -223,8 +219,12 @@ int main(int argc, char const *argv[]) {
 				writeToFile.push_back(spd);
 			}
 		}
+		delete[] timestep.coords;//not sure if this is necessary
 	}
 	std::cout << "Back to serial" << std::endl;
+	std::cout << "Closing file '" << dcdFile << "'" << std::endl;
+	close_file_read(v);
+	std::cout << ".dcd file closed" << std::endl;
 	delete[] c_dcdFile;
 
 	//sort correctly
