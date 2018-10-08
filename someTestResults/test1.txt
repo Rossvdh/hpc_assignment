@@ -1,7 +1,6 @@
 preliminary test. 6 October 2018
-using files from master 392aece
 
-TEST 1----------------------------------------
+TEST 1 (master 392aece)------------------------------------------------
 start timer
 for each timestep:
  	read timestep
@@ -23,7 +22,7 @@ run		serial		parallel
 5		17.718		17.702
 
 
-TEST 2------------------------------------------------
+TEST 2 (master ccca3b7)------------------------------------------------
 dcd file has been opened
 read timestep data into vector
 close dcd file
@@ -37,3 +36,12 @@ end timer
 sort writeToFile
 write output to file
 done
+
+using files Simulate_v2.cpp and omp_v2.cpp
+
+run		serial 		parallel
+1		4.507		2.723
+2		4.797		2.714
+3		4.517		2.713
+4		4.811		2.695
+5		4.702		2.675

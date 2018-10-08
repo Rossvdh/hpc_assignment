@@ -46,8 +46,15 @@ omp_v2.o: omp_v2.cpp dcdplugin.c
 runopenmptimestep: openmptimestep
 	./omp_v2 -i example_input_file1.txt -o openMPTimestepOutput.txt
 
-#MPI version to come
+#MPI -------------------------------------------------------------------
+#compile
+mpi: mpi.c
+	mpicc mpi.c -o mpi -lm
 
+runmpi: mpi
+	mpiexec -n 4 mpi -i example_input_file1.txt -o mpiOutput.txt
+
+# ---------------------------------------------------------------------
 clean:
 	rm *.o
 	rm Simulate
