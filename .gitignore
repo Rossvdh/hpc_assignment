@@ -1,5 +1,9 @@
 Simulate
+Simulate_v2
 SimulateOMP
+mpi
+omp_v2
+
 *.o
 *.exe
 *.pdf
