@@ -3,6 +3,7 @@ Simulate_v2
 SimulateOMP
 mpi
 omp_v2
+my_mpi
 
 *.o
 *.exe
