@@ -47,12 +47,27 @@ runopenmptimestep: openmptimestep
 	./omp_v2 -i example_input_file1.txt -o openMPTimestepOutput.txt
 
 #MPI -------------------------------------------------------------------
-#compile
-mpi: mpi.c
-	mpicc mpi.c -o mpi -lm
+#link
+mpi: my_mpi.o
+	g++ -g -o mpi mpiPrelims.o my_mpi.o -std=c++11
+	# mpicc -lm -g -o mpi mpiPrelims.o my_mpi.o
+
+# compile
+my_mpi.o: my_mpi.c mpiPrelims.cpp
+	mpicc -c -lm -o my_mpi.o my_mpi.c
+	g++ -c -g -o mpiPrelims.o mpiPrelims.cpp -std=c++11
 
 runmpi: mpi
 	mpiexec -n 4 mpi -i example_input_file1.txt -o mpiOutput.txt
+	# ./mpi -i example_input_file1.txt -o mpiOutput.txt
+
+# ---------------------------------------------------------------------
+test: fileTest.c
+	gcc -g -o fileTest fileTest.c
+
+runtest: test
+	./fileTest -i example_input_file1.txt
+
 
 # ---------------------------------------------------------------------
 clean:

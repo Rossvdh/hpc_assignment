@@ -1043,7 +1043,7 @@ static void close_file_read(void *v) {
 	free(dcd);
 }
 
-
+//we don't use this function
 static void *open_dcd_write(const char *path, const char *filetype,
                             int natoms) {
 	dcdhandle *dcd;

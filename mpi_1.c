@@ -9,10 +9,12 @@ Ross van der Heyde VHYROS001
 #include "mpi.h"
 
 int main(int argc, char *argv[]) {
+	/*argv is an array, passed as a char*
+	the args are c-strings: char[] or char*
+
+	*/
 	int myid;
 	int nodenum;
-
-	printf("Hello\n");
 
 	MPI_Init(&argc, &argv);                 //Start MPI
 	MPI_Comm_rank(MPI_COMM_WORLD, &myid);           //get rank of node's process
@@ -21,13 +23,12 @@ int main(int argc, char *argv[]) {
 	if (myid == 0) {
 		//read timestep data from dcdfile into vector
 		//here in main thread.
-		//can all the threads access the vector/How to make a variable shared? NO
-		//or do I have to send the data to each thread? Yes, I think so
+		//send the data to each thread
 		printf("Simulate MPI");
 
 		//read cmd line params
-		char inputFile[] = "";
-		char outputFile[] = "";
+		char* inputFile;
+		char* outputFile;
 
 		int i;
 		for (i = 0; i < argc; ++i) {
