@@ -47,15 +47,24 @@ runopenmptimestep: openmptimestep
 	./omp_v2 -i example_input_file1.txt -o openMPTimestepOutput.txt
 
 #MPI -------------------------------------------------------------------
-mpi: my_mpi.o
-	mpicc -o my_mpi my_mpi.o -I ./library/ -L ./library/ -llibrary
+mpi: my_mpi.o library
+	mpicc -g -o my_mpi my_mpi.o -I ./library/ -L ./library/ -llibrary
+
+library: library.o
+	g++ -g -o ./library/liblibrary.so ./library/library.o -fPIC -shared -std=c++11
+
+library.o: ./library/library.cpp
+	g++ -g -c -o ./library/library.o ./library/library.cpp -fPIC -shared -std=c++11
+
 
 my_mpi.o: my_mpi.c
-	mpicc -c -o my_mpi.o my_mpi.c -I ./library/ -L ./library/ -llibrary
+	mpicc -g -c -o my_mpi.o my_mpi.c -I ./library/ -L ./library/ -llibrary
 
 runmpi: mpi
 	export LD_LIBRARY_PATH=library/ && mpiexec -n 4 my_mpi -i example_input_file1.txt -o mpiOutput.txt
 
+debugmpi:
+	export LD_LIBRARY_PATH=library/ && gdb --args my_mpi -i example_input_file1.txt -o mpiOutput.txt
 # ---------------------------------------------------------------------
 test: fileTest.c
 	gcc -g -o fileTest fileTest.c
@@ -68,4 +77,5 @@ runtest: test
 clean:
 	rm *.o
 	rm Simulate
+	rm my_mpi
 #	rm *.exe
