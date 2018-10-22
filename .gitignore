@@ -4,7 +4,7 @@ SimulateOMP
 mpi
 omp_v2
 my_mpi
-
+hex/
 *.o
 *.exe
 *.pdf
