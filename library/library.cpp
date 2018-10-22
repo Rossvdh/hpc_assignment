@@ -15,45 +15,6 @@ extern "C" void func(void) {
 	std::cout << "\n This is a C++ code\n";
 }
 
-/*extern "C" int* parseNumbers(std::string& numbers, int* count) {
-	// std::cout << "parseNumbers: " << numbers << std::endl;
-	std::vector<int> vec;
-	std::istringstream iss(numbers);
-	std::string token;
-
-	while (std::getline(iss, token, ',')) {
-		int dash = token.find("-");
-		if (dash > 0) {
-			int start = std::stoi(token.substr(0, dash));
-			int end = std::stoi(token.substr(dash + 1));
-
-			for (int i = start; i <= end; ++i) {
-				vec.push_back(i);
-			}
-
-		} else {
-			vec.push_back(std::stoi(token));
-		}
-	}
-
-	*count = vec.size();
-
-	if (*count == 10) {
-		//must be b
-		for (int i = 0; i < *count; ++i) {
-			std::cout << "vec[" << i << "]: " << vec[i] << std::endl;
-		}
-
-		int* t = &vec[0];
-		for (int i = 0; i < *count; ++i) {
-			std::cout << "t[" << i << "]: " << t[i] << std::endl;
-		}
-	}
-
-	return &vec[0];
-}*/
-
-
 extern "C" std::vector<int> parseNumbers(std::string& numbers, int* count) {
 	// std::cout << "parseNumbers: " << numbers << std::endl;
 	std::vector<int> vec;

@@ -47,24 +47,49 @@ runopenmptimestep: openmptimestep
 	./omp_v2 -i example_input_file1.txt -o openMPTimestepOutput.txt
 
 #MPI -------------------------------------------------------------------
-mpi: my_mpi.o library
-	mpicc -g -o my_mpi my_mpi.o -I ./library/ -L ./library/ -llibrary
+runmpi: mpiCPP
+	mpiexec -n 4 my_mpiCPP -i example_input_file1.txt -o mpiOutput.txt
 
-library: library.o
-	g++ -g -o ./library/liblibrary.so ./library/library.o -fPIC -shared -std=c++11
+mpiCPP: mpiCPP.o
+	mpic++ -lm -g -o my_mpiCPP my_mpiCPP.o
 
-library.o: ./library/library.cpp
-	g++ -g -c -o ./library/library.o ./library/library.cpp -fPIC -shared -std=c++11
+mpiCPP.o: mpiCPP.cpp
+	mpic++ -lm -g -c -o my_mpiCPP.o mpiCPP.cpp -std=c++11
 
+debugmpi: mpiCPP
+	gdb --args my_mpiCPP -i example_input_file1.txt -o mpiOutput.txt
 
-my_mpi.o: my_mpi.c
-	mpicc -g -c -o my_mpi.o my_mpi.c -I ./library/ -L ./library/ -llibrary
+cleanmpi:
+	rm *.o
+	rm my_mpiCPP
 
-runmpi: mpi
-	export LD_LIBRARY_PATH=library/ && mpiexec -n 4 my_mpi -i example_input_file1.txt -o mpiOutput.txt
+# ---------------------------
+runmpi_2: mpiCPP_2
+	mpiexec -n 4 my_mpiCPP -i example_input_file1.txt -o mpiOutput.txt
 
-debugmpi:
-	export LD_LIBRARY_PATH=library/ && gdb --args my_mpi -i example_input_file1.txt -o mpiOutput.txt
+mpiCPP_2: mpiCPP_2.o
+	mpic++ -lm -g -o my_mpiCPP my_mpiCPP.o
+
+mpiCPP_2.o: mpiCPP_2.cpp
+	mpic++ -lm -g -c -o my_mpiCPP.o mpiCPP_2.cpp -std=c++11
+
+# mpi: library my_mpi.o
+# 	mpiCC -lm -g -o my_mpi my_mpi.o -I ./library/ -L ./library/ -llibrary
+
+# library: library.o
+# 	g++ -lm -g -o ./library/liblibrary.so ./library/library.o -fPIC -shared -std=c++11
+
+# library.o: ./library/library.cpp
+# 	g++ -lm -g -c -o ./library/library.o ./library/library.cpp -fPIC -shared -std=c++11
+
+# my_mpi.o: my_mpi.c
+# 	mpiCC -lm -g -c -o my_mpi.o my_mpi.c -I ./library/ -L ./library/ -llibrary
+
+# runmpi: mpi
+# 	export LD_LIBRARY_PATH=library/ && mpiexec -n 4 my_mpi -i example_input_file1.txt -o mpiOutput.txt
+
+# debugmpi:
+# 	export LD_LIBRARY_PATH=library/ && gdb --args my_mpi -i example_input_file1.txt -o mpiOutput.txt
 # ---------------------------------------------------------------------
 test: fileTest.c
 	gcc -g -o fileTest fileTest.c
