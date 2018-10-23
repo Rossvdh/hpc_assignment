@@ -243,7 +243,7 @@ int main(int argc, char* argv[]) {
 		shortPairData kShortest [k * timestepCount];
 
 		std::cout << "process " << myid << " calculating" << std::endl;
-		for (int t = start; t < end; t++) {
+		for (int t = start; t <= end; t++) {
 			//vector of distances
 			std::vector<shortPairData> distances;
 
@@ -296,8 +296,8 @@ int main(int argc, char* argv[]) {
 
 			// MPI_Recv(&counts[i], 1, MPI_INT, i, 6, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-			writeToFile[i] = new shortPairData[k*counts[i]];
-			std::cout << "process 0 receiving "<<(k*counts[i]) <<" points from process "<<i << '\n';
+			writeToFile[i] = new shortPairData[k * counts[i]];
+			std::cout << "process 0 receiving " << (k * counts[i]) << " points from process " << i << '\n';
 			MPI_Recv(writeToFile[i], k * counts[i], mpi_spd, i, 7, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 		}
 		time = MPI_Wtime();
@@ -313,7 +313,7 @@ int main(int argc, char* argv[]) {
 		for (int i = 0; i < nodenum; ++i) {
 			// std::cout << "i: " << i << std::endl;
 			int count = counts[i];
-			std::cout << "process 0 about to write " << (k*count) << " points from process "<< i <<" to file" << '\n';
+			std::cout << "process 0 about to write " << (k * count) << " points from process " << i << " to file" << '\n';
 			for (int j = 0; j < (k * count); j++) {
 				// std::cout << "\tj: " << j << std::endl;
 				outFile << spdToString(writeToFile[i][j]) << "\n";
