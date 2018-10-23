@@ -93,9 +93,9 @@ int main(int argc, char* argv[]) {
 		std::cout << "output file: " << outputFile << std::endl;
 
 		//clear text from output file
-		std::ofstream outFile(outputFile);
-		outFile << "";
-		outFile.close();
+		// std::ofstream outFile(outputFile);
+		// outFile << "";
+		// outFile.close();
 
 		//read lines from input file one at a time
 		std::ifstream myFile(inputFile);
@@ -142,6 +142,7 @@ int main(int argc, char* argv[]) {
 		char* fileName [] = {c_dcdFile};
 
 		int natoms;
+		double initTime = MPI_Wtime();
 		void* v = open_dcd_read(*fileName, "dcd", &natoms);
 		std::cout << "'" << dcdFile << "' opened" << std::endl;
 		std::cout << "natoms: " << natoms << std::endl;
@@ -182,6 +183,8 @@ int main(int argc, char* argv[]) {
 		close_file_read(v);
 		std::cout << ".dcd file closed" << std::endl;
 		delete[] c_dcdFile;
+		double time = MPI_Wtime() - initTime;
+		std::cout << "Time to read file: " << time << '\n';
 
 		//broadcast k to other processes
 		std::cout << "broadcast k..." << std::endl;
@@ -201,7 +204,8 @@ int main(int argc, char* argv[]) {
 		//send appropriate timesteps to processes
 		std::cout << "timesteps.size(): " << numTimesteps << std::endl;
 		std::cout << "intv 0: 0 to " << std::floor(numTimesteps / nodenum) << std::endl;
-
+		initTime = MPI_Wtime();
+		int counts[nodenum];
 		for (int i = 1; i < nodenum; ++i) {
 			int start = i * std::floor(numTimesteps / nodenum) + 1;
 			int end;
@@ -212,6 +216,7 @@ int main(int argc, char* argv[]) {
 			}
 
 			int count = end - start + 1;
+			counts[i] = count;
 			MPI_Send(&count, 1, MPI_INT, i, 3, MPI_COMM_WORLD);
 			MPI_Send(&start, 1, MPI_INT, i, 4, MPI_COMM_WORLD);
 
@@ -222,8 +227,11 @@ int main(int argc, char* argv[]) {
 			}
 			std::cout << "intv " << i << ": " << start << " to " << end << std::endl;
 		}
+		time = MPI_Wtime();
+		std::cout << "Time to broadcast: " << time << '\n';
 
 		//main does first quarter/eighth whatever
+		initTime = MPI_Wtime();
 		int start = 0;
 		int end = std::floor(numTimesteps / nodenum);
 
@@ -271,7 +279,7 @@ int main(int argc, char* argv[]) {
 			                  ->bool{return lhs.distance <= rhs.distance;});
 
 			for (int i = 0; i < k; ++i) {
-				std::cout << "kShortest[(t  * k ) + i]" << ((t  * k ) + i) << std::endl;
+				// std::cout << "kShortest[(t  * k ) + i]" << ((t  * k ) + i) << std::endl;
 				kShortest[(t  * k ) + i] = distances[i];
 			}
 		}
@@ -279,36 +287,44 @@ int main(int argc, char* argv[]) {
 
 		//receive k shortest from other processes
 		shortPairData* writeToFile[nodenum];
-		int counts[nodenum];
+		// int counts[nodenum];
 		writeToFile[0] = kShortest;
 		counts[0] = timestepCount;
 		std::cout << "main is receiving shortest pair data..." << std::endl;
 		for (int i = 1; i < nodenum; i++) {
 			// MPI_Recv(&timestepCount, 1, MPI_INT, 0, 3, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-			MPI_Recv(&counts[i], 1, MPI_INT, i, 6, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			// MPI_Recv(&counts[i], 1, MPI_INT, i, 6, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-			writeToFile[i] = new shortPairData[counts[i]];
+			writeToFile[i] = new shortPairData[k*counts[i]];
+			std::cout << "process 0 receiving "<<(k*counts[i]) <<" points from process "<<i << '\n';
 			MPI_Recv(writeToFile[i], k * counts[i], mpi_spd, i, 7, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 		}
+		time = MPI_Wtime();
+		std::cout << "Time to calculate and receive data: " << time << '\n';
 		//sort. Shouldn't be necessary
 		//write to output file (use c++ library function?)
 		std::cout << "main is writing to file..." << std::endl;
-		outFile.open(outputFile);
+		initTime = MPI_Wtime();
+		std::ofstream outFile(outputFile, std::ofstream::out | std::ofstream::ate);
 		outFile.precision(15);
 
 		//write k shortest distances to file
 		for (int i = 0; i < nodenum; ++i) {
 			// std::cout << "i: " << i << std::endl;
 			int count = counts[i];
-
-			for (int j = 0; j < count; j++) {
+			std::cout << "process 0 about to write " << (k*count) << " points from process "<< i <<" to file" << '\n';
+			for (int j = 0; j < (k * count); j++) {
 				// std::cout << "\tj: " << j << std::endl;
 				outFile << spdToString(writeToFile[i][j]) << "\n";
 			}
 		}
+		std::cout << "file writing complete, about to close output file" << std::endl;
 		outFile.close();
-		std::cout << "file writing complete" << std::endl;
+		std::cout << "output file closed" << '\n';
+
+		time = MPI_Wtime() - initTime;
+		std::cout << "Time to write to file: " << time << '\n';
 
 		for (int i = 1; i < nodenum; i++) {
 			delete[]writeToFile[i];
@@ -413,8 +429,8 @@ int main(int argc, char* argv[]) {
 		//TODO: send kShortest back to main
 		// MPI_Send(&count, 1, MPI_INT, i, 3, MPI_COMM_WORLD);
 		std::cout << "process " << myid << " is sending shortPairData to main..." << std::endl;
-		MPI_Send(&timestepCount, 1, MPI_INT, 0, 6, MPI_COMM_WORLD);
-		std::cout << "timestepCount sent from process " << myid << " to main" << std::endl;
+		// MPI_Send(&timestepCount, 1, MPI_INT, 0, 6, MPI_COMM_WORLD);
+		// std::cout << "timestepCount sent from process " << myid << " to main" << std::endl;
 		std::cout <<  "process " << myid << " timeStepCount * k: " << (timestepCount * k) << std::endl;
 
 		MPI_Send(kShortest, k * timestepCount, mpi_spd, 0, 7, MPI_COMM_WORLD);
