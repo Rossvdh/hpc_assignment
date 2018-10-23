@@ -6,6 +6,7 @@ Then writes shortest pair data from vector into output file in serial
 Ross van der Heyde VHYROS001
 19 September 2018*/
 
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -60,7 +61,8 @@ struct shortPairData {
 	}
 };
 
-int main(int argc, char const *argv[]) {
+
+int openmp(int argc, char const *argv[]) {
 	std::cout << "Simulate with OpenMP" << std::endl;
 
 	//read cmd line params
@@ -121,6 +123,7 @@ int main(int argc, char const *argv[]) {
 	//now the fun starts
 
 	//read DCD file
+	double initTime = getTime();
 	std::cout << "Reading .dcd file '" << dcdFile << "'...\n" << std::endl;
 
 	//get fileName as C-style string because we need to pass it as a char**
@@ -139,7 +142,7 @@ int main(int argc, char const *argv[]) {
 	dcdhandle* handle = (dcdhandle*) v;
 	// std::cout << "cast" << std::endl;
 	std::cout << "frames: " << handle->nsets << std::endl;
-
+	int totalTimesteps = handle->nsets;
 	//dcd file has been opened
 	//read timestep data into vector
 	//start timer
@@ -153,25 +156,40 @@ int main(int argc, char const *argv[]) {
 	//done
 
 	//read timesteps. this seems very inefficient. uses a lot of memory. may its just my weak laptop
-	std::vector<molfile_timestep_t> timesteps;
-	for (int timestepCounter = 0; timestepCounter < handle->nsets; ++timestepCounter) {
+	// std::vector<molfile_timestep_t> timesteps;
+	float** timestepsData = new float*[totalTimesteps];
+
+	for (int timestepCounter = 0; timestepCounter < totalTimesteps; ++timestepCounter) {
 		// std::cout << "timestep: " << timestepCounter << std::endl;
+		timestepsData[timestepCounter] = new float[3 * natoms];
+
 		molfile_timestep_t timestep; // data for the current timestep
 		timestep.coords = (float *)malloc(3 * sizeof(float) * natoms); //change to normal array?
 		int rc = read_next_timestep(v, natoms, &timestep);
 
-		timesteps.push_back(timestep);
+		// timesteps.push_back(timestep);
+		memcpy(timestepsData[timestepCounter], timestep.coords, 3 * natoms * sizeof(float));
+		delete[] timestep.coords;
 	}
+
+	std::cout << "Closing file '" << dcdFile << "'" << std::endl;
+	close_file_read(v);
+	std::cout << ".dcd file closed" << std::endl;
+	delete[] c_dcdFile;
+
+	double time = (getTime() - initTime) / 1000;
+	std::cout << "Time to read .dcd file: " << time << " s" << std::endl;;
 
 	std::vector<shortPairData> writeToFile;// e.g. "0,304,168043,14.23986456"
 	// std::cout << "timesteps.size: " << timesteps.size() << std::endl;
 	// std::cout << "About to enter the parallel section...!" << std::endl;
-	double initTime = getTime();
+	initTime = getTime();
 	#pragma omp parallel for
-	for (int t = 0; t < handle->nsets; ++t) {
+	for (int t = 0; t < totalTimesteps; ++t) {
 		// the timesteps are independent of each other, so this loop can be parallelized
-		std::cout << "timestep " << t << std::endl;
-		const molfile_timestep_t timestep = timesteps[t];
+		// std::cout << "timestep " << t << std::endl;
+		// const molfile_timestep_t timestep = timesteps[t];
+
 		std::vector<std::pair<std::string, double> > distances;
 		for (std::vector<int>::iterator aIt = aIndx.begin(); aIt != aIndx.end(); ++aIt) {
 			//the calculations for distances of the a atoms are independent of each other,
@@ -181,18 +199,24 @@ int main(int argc, char const *argv[]) {
 			float ax, ay, az;
 			int a = *aIt;
 			// std::cout << "a atom: " << a << std::endl;
-			ax = timestep.coords[3 * a];
+			/*ax = timestep.coords[3 * a];
 			ay = timestep.coords[(3 * a) + 1];
-			az = timestep.coords[(3 * a) + 2];
+			az = timestep.coords[(3 * a) + 2];*/
+			ax = timestepsData[t][3 * a];
+			ay = timestepsData[t][(3 * a) + 1];
+			az = timestepsData[t][(3 * a) + 2];
 
 			for (std::vector<int>::iterator bIt = bIndx.begin(); bIt != bIndx.end(); ++bIt) {
 				//coords of atom
 				float bx, by, bz;
 				int b = *bIt;
 				// std::cout << "b atom: " << b << std::endl;
-				bx = timestep.coords[3 * b];
+				/*bx = timestep.coords[3 * b];
 				by = timestep.coords[(3 * b) + 1];
-				bz = timestep.coords[(3 * b) + 2];
+				bz = timestep.coords[(3 * b) + 2];*/
+				bx = timestepsData[t][3 * b];
+				by = timestepsData[t][(3 * b) + 1];
+				bz = timestepsData[t][(3 * b) + 2];
 
 				double dist = sqrt(pow((ax - bx), 2) + pow((ay - by), 2) + pow((az - bz), 2));
 
@@ -203,6 +227,8 @@ int main(int argc, char const *argv[]) {
 				distances.push_back(entry);
 			}
 		}
+		delete[] timestepsData[t];
+
 		//sort first k based on distances
 		std::partial_sort(distances.begin(), distances.begin() + k, distances.end(),
 		                  [](const std::pair<std::string, double>& lhs, const std::pair<std::string, double>& rhs)
@@ -219,13 +245,9 @@ int main(int argc, char const *argv[]) {
 				writeToFile.push_back(spd);
 			}
 		}
-		delete[] timestep.coords;//not sure if this is necessary
+		// delete[] timestep.coords;//not sure if this is necessary
 	}
-	std::cout << "Back to serial" << std::endl;
-	std::cout << "Closing file '" << dcdFile << "'" << std::endl;
-	close_file_read(v);
-	std::cout << ".dcd file closed" << std::endl;
-	delete[] c_dcdFile;
+	delete[] timestepsData;
 
 	//sort correctly
 	std::sort(writeToFile.begin(), writeToFile.end(),
@@ -236,9 +258,13 @@ int main(int argc, char const *argv[]) {
 			return p1.timestep < p2.timestep;
 		}
 	});
+	time = (getTime() - initTime) / 1000;
+	std::cout << "Time to perform calculations: " << time << " s" << std::endl;
+	std::cout << "Back to serial" << std::endl;
 
 
 	std::cout << "writing to output file '" << outputFile << "' " << std::endl;
+	initTime = getTime();
 	outFile.open(outputFile);
 	outFile.precision(15);
 
@@ -248,10 +274,20 @@ int main(int argc, char const *argv[]) {
 	}
 
 	outFile.close();
-	double time = getTime() - initTime;
+	time = (getTime() - initTime) / 1000;
+	std::cout << "Time to write to output file: " << time << " s" << std::endl;
 	std::cout << "writing output complete" << std::endl;
-	std::cout << "Total time: " << (time / 1000) << " s" << std::endl;
 
 	std::cout << "Complete" << std::endl;
+	return 0;
+}
+
+int main(int argc, char const *argv[]) {
+	// for (size_t i = 0; i < 10; i++) {
+	// 	std::cout << "openmp run " << i << '\n';
+	openmp(argc, argv);
+	// std::cout << "\n" << '\n';
+
+	// }
 	return 0;
 }

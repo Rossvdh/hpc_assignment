@@ -23,8 +23,8 @@ openmp: omp_v2.o
 omp_v2.o: omp_v2.cpp dcdplugin.c
 	g++ -c -g -fopenmp -o omp_v2.o omp_v2.cpp -std=c++11
 
-runopenmp: openmptimestep
-	./omp_v2 -i example_input_file1.txt -o openMPTimestepOutput.txt
+runopenmp: openmp
+	./omp_v2 -i example_input_file1.txt -o openMPOutput.txt
 
 cleanopenmp:
 	rm omp_v2.o
