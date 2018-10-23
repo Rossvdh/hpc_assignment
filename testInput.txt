@@ -1,4 +1,0 @@
-example_pn3_10RU_751frames.dcd
-3
-1-4
-168043-168045

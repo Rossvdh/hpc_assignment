@@ -5,6 +5,7 @@ mpi
 omp_v2
 my_mpi
 hex/
+report/
 *.o
 *.exe
 *.pdf
